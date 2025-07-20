@@ -9,8 +9,6 @@ export const analyzeArticle = async (fullText) => {
   }
 
   try {
-    console.log('Iniciando análise do artigo...');
-    
     // Usando o caminho absoluto para a API
     const response = await fetch(`${window.location.origin}/api/analyze`, {
       method: 'POST',
@@ -21,13 +19,8 @@ export const analyzeArticle = async (fullText) => {
       body: JSON.stringify({ fullText }),
     });
 
-    console.log('Status da resposta:', response.status);
-    console.log('URL da resposta:', response.url);
-    console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
-
     // Tenta ler o corpo da resposta como texto primeiro
     const responseText = await response.text();
-    console.log('Resposta do servidor:', responseText.substring(0, 200)); // Mostra apenas os primeiros 200 caracteres
 
     // Verifica se a resposta é HTML (erro 404 ou similar)
     if (responseText.trim().toLowerCase().startsWith('<!doctype html>')) {

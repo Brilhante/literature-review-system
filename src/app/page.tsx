@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { searchArticles } from '../services/coreApi';
 import { analyzeArticle } from '../services/aiAnalysis';
+import { ArticleDetails } from '@/components/ArticleDetails';
+import { SearchFormCard } from '@/components/SearchFormCard';
+import { ArticleList } from '@/components/ArticleList';
+import { Pagination } from '@/components/Pagination';
 
 interface Article {
   id: string;
@@ -10,7 +14,6 @@ interface Article {
   authors: string[];
   year: number;
   abstract: string;
-  source: string;
   url: string;
   method?: string;
   location?: string;
@@ -45,6 +48,7 @@ interface ApiArticle {
 
 export default function Home() {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [allArticles, setAllArticles] = useState<Article[]>([]); // Todos os artigos da API
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,6 +59,7 @@ export default function Home() {
   const [totalResults, setTotalResults] = useState(0);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [, setAnalyzing] = useState(false);
+  const [hasMoreResults, setHasMoreResults] = useState(false); // Se há mais resultados disponíveis
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,42 +72,89 @@ export default function Home() {
       if (searchYear) filters.year = searchYear;
       if (searchAuthor) filters.author = searchAuthor;
 
-      const results = await searchArticles(searchTerm, filters);
+      const results = await searchArticles(searchTerm, filters, 1);
       const articlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
         ...article,
         id: `${article.title}-${article.year}-${index}-${Date.now()}`
       }));
 
-      setArticles(articlesWithIds);
-      setTotalPages(results.totalPages);
+      setAllArticles(articlesWithIds);
+      setHasMoreResults(results.hasMoreResults);
+      
+      // Mostrar apenas os primeiros 10 artigos
+      setArticles(articlesWithIds.slice(0, 10));
+      setTotalPages(Math.ceil(results.totalHits / 10));
       setTotalResults(results.totalHits);
       setSelectedArticle(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao buscar artigos');
       setArticles([]);
+      setAllArticles([]);
       setTotalPages(0);
       setTotalResults(0);
+      setHasMoreResults(false);
     } finally {
       setLoading(false);
     }
   };
 
   const handlePageChange = async (newPage: number) => {
+    console.log('Mudando para página:', newPage);
+    
+    // Calcular quantos artigos já temos carregados
+    const articlesPerPage = 10;
+    const totalLoadedArticles = allArticles.length;
+    const maxLocalPages = Math.ceil(totalLoadedArticles / articlesPerPage);
+    
+    // Se a página solicitada está dentro dos artigos já carregados
+    if (newPage <= maxLocalPages) {
+      setCurrentPage(newPage);
+      const startIndex = (newPage - 1) * articlesPerPage;
+      const endIndex = startIndex + articlesPerPage;
+      setArticles(allArticles.slice(startIndex, endIndex));
+      return;
+    }
+    
+    // Se precisamos buscar mais artigos da API e há mais resultados disponíveis
+    if (!hasMoreResults) {
+      console.log('Não há mais resultados disponíveis');
+      return;
+    }
+    
     setLoading(true);
     setCurrentPage(newPage);
+    
     try {
       const filters: SearchFilters = {};
       if (searchYear) filters.year = searchYear;
       if (searchAuthor) filters.author = searchAuthor;
 
-      const results = await searchArticles(searchTerm, filters);
-      const articlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
+      // Calcular qual página da API precisamos buscar
+      const apiPage = Math.ceil((newPage * articlesPerPage) / 50);
+      console.log('Buscando artigos da API, página:', apiPage);
+      
+      const results = await searchArticles(searchTerm, filters, apiPage);
+      const newArticlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
         ...article,
         id: `${article.title}-${article.year}-${index}-${Date.now()}`
       }));
 
-      setArticles(articlesWithIds);
+      // Adicionar novos artigos aos existentes
+      const updatedAllArticles = [...allArticles, ...newArticlesWithIds];
+      setAllArticles(updatedAllArticles);
+      setHasMoreResults(results.hasMoreResults);
+      
+      // Atualizar total de resultados
+      setTotalResults(updatedAllArticles.length);
+      setTotalPages(Math.ceil(updatedAllArticles.length / articlesPerPage));
+      
+      // Mostrar a página solicitada
+      const startIndex = (newPage - 1) * articlesPerPage;
+      const endIndex = startIndex + articlesPerPage;
+      setArticles(updatedAllArticles.slice(startIndex, endIndex));
+      
     } catch (err) {
+      console.error('Erro na paginação:', err);
       setError(err instanceof Error ? err.message : 'Erro ao buscar artigos');
     } finally {
       setLoading(false);
@@ -136,62 +188,16 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-4xl font-bold mb-8 text-gray-900 text-center">Sistema de Revisão de Literatura</h1>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-                  Termo de Busca
-                </label>
-                <input
-                  id="search"
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Digite sua busca..."
-                  className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                />
-              </div>
-              <div>
-                <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
-                  Ano
-                </label>
-                <input
-                  id="year"
-                  type="number"
-                  value={searchYear}
-                  onChange={(e) => setSearchYear(e.target.value)}
-                  placeholder="Ex: 2023"
-                  min="1900"
-                  max={new Date().getFullYear()}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                />
-              </div>
-              <div>
-                <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
-                  Autor
-                </label>
-                <input
-                  id="author"
-                  type="text"
-                  value={searchAuthor}
-                  onChange={(e) => setSearchAuthor(e.target.value)}
-                  placeholder="Nome do autor"
-                  className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                />
-              </div>
-            </div>
-            <div className="flex justify-center">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium text-lg shadow-sm hover:shadow-md"
-              >
-                {loading ? 'Buscando...' : 'Buscar Artigos'}
-              </button>
-            </div>
-          </form>
-        </div>
+        <SearchFormCard
+          searchTerm={searchTerm}
+          searchYear={searchYear}
+          searchAuthor={searchAuthor}
+          loading={loading}
+          onSearchTermChange={setSearchTerm}
+          onSearchYearChange={setSearchYear}
+          onSearchAuthorChange={setSearchAuthor}
+          onSubmit={handleSearch}
+        />
 
         {error && (
           <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-sm">
@@ -199,282 +205,26 @@ export default function Home() {
             <p>{error}</p>
           </div>
         )}
-
         {articles.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-900">Resultados da Busca</h2>
-                  <span className="text-gray-600 font-medium">
-                    Total: {totalResults} artigos
-                  </span>
-                </div>
-                <div className="space-y-6">
-                  {articles.map((article) => (
-                    <div
-                      key={article.id}
-                      className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer bg-white"
-                      onClick={() => handleArticleSelect(article)}
-                    >
-                      <h3 className="text-xl font-semibold mb-3 text-gray-900 hover:text-blue-600 transition-colors">
-                        {article.title}
-                      </h3>
-                      <div className="space-y-2 text-gray-600">
-                        <p>
-                          <span className="font-medium text-gray-700">Autores:</span>{' '}
-                          {article.authors.join(', ')}
-                        </p>
-                        <p>
-                          <span className="font-medium text-gray-700">Ano:</span>{' '}
-                          {article.year}
-                        </p>
-                        <p className="line-clamp-3">
-                          <span className="font-medium text-gray-700">Resumo:</span>{' '}
-                          {article.abstract}
-                        </p>
-                        {article.url && (
-                          <a
-                            href={article.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block mt-2 text-blue-600 hover:text-blue-800 font-medium"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Acessar Artigo Completo →
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <ArticleList
+                articles={articles}
+                totalResults={totalResults}
+                onSelect={handleArticleSelect}
+              />
 
-                {totalPages > 1 && (
-                  <div className="mt-8 flex justify-center space-x-4">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1 || loading}
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium"
-                    >
-                      ← Anterior
-                    </button>
-                    <span className="px-6 py-2 text-gray-700 font-medium">
-                      Página {currentPage} de {totalPages}
-                    </span>
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages || loading}
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium"
-                    >
-                      Próxima →
-                    </button>
-                  </div>
-                )}
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                loading={loading}
+                onPageChange={handlePageChange}
+                hasMoreResults={hasMoreResults}
+              />
             </div>
 
-            <div className="lg:col-span-1">
-              <div className="sticky top-4 bg-white rounded-lg shadow-md">
-                {selectedArticle ? (
-                  <div>
-                    <div className="p-6 border-b border-gray-200">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        Detalhes do Artigo
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        Informações detalhadas sobre o artigo selecionado
-                      </p>
-                    </div>
-
-                    <div className="p-6 space-y-6">
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Universidade</h4>
-                        <p className="text-gray-900 font-medium">
-                          {selectedArticle.university || 'Não informado'}
-                        </p>
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Autores</h4>
-                        <p className="text-gray-900 font-medium">
-                          {selectedArticle.authors.length} autor(es)
-                        </p>
-                        <div className="mt-2 space-y-1">
-                          {selectedArticle.authors.map((author, index) => (
-                            <p key={index} className="text-gray-600 text-sm">
-                              • {author}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Revista</h4>
-                        {selectedArticle.journal ? (
-                          <>
-                            <p className="text-gray-900 font-medium">
-                              {selectedArticle.journal}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-gray-500 italic">Não informado</p>
-                        )}
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Tipo de Artigo</h4>
-                        <p className="text-gray-900 font-medium">
-                          {selectedArticle.type || 'Não informado'}
-                        </p>
-                      </div>
-
-                      {/* <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Metodologia</h4>
-                        {selectedArticle.method ? (
-                          <p className="text-gray-900">
-                            {selectedArticle.method}
-                          </p>
-                        ) : (
-                          <p className="text-gray-500 italic">Não informado</p>
-                        )}
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Região do Estudo</h4>
-                        {selectedArticle.location ? (
-                          <p className="text-gray-900">
-                            {selectedArticle.location}
-                          </p>
-                        ) : (
-                          <p className="text-gray-500 italic">Não informado</p>
-                        )}
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Participantes</h4>
-                        {selectedArticle.participants ? (
-                          <p className="text-gray-900">
-                            {selectedArticle.participants}
-                          </p>
-                        ) : (
-                          <p className="text-gray-500 italic">Não informado</p>
-                        )}
-                      </div> */}
-
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Palavras-chave Principais</h4>
-                        {selectedArticle.mainKeywords && selectedArticle.mainKeywords.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {selectedArticle.mainKeywords.map((keyword, index) => (
-                              <span
-                                key={index}
-                                className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
-                              >
-                                {keyword}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 italic">Não informado</p>
-                        )}
-                      </div>
-
-                      {selectedArticle.url && (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="text-sm font-medium text-gray-500 mb-2">Link do Artigo</h4>
-                          <a
-                            href={selectedArticle.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Acessar Artigo Completo
-                            <svg
-                              className="w-4 h-4 ml-1"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                              />
-                            </svg>
-                          </a>
-                        </div>
-                      )}
-
-                      {/* <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Análise do Artigo</h4>
-                        {analyzing ? (
-                          <div className="flex items-center space-x-2 text-gray-600">
-                            <svg className="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Analisando artigo...</span>
-                          </div>
-                        ) : (
-                          <>
-                            {selectedArticle.method && (
-                              <p className="text-gray-900">
-                                Metodologia: {selectedArticle.method}
-                              </p>
-                            )}
-                            {selectedArticle.location && (
-                              <p className="text-gray-900">
-                                Região: {selectedArticle.location}
-                              </p>
-                            )}
-                            {selectedArticle.participants && (
-                              <p className="text-gray-900">
-                                Participantes: {selectedArticle.participants}
-                              </p>
-                            )}
-                            {selectedArticle.mainKeywords && selectedArticle.mainKeywords.length > 0 && (
-                              <div className="mt-2 space-y-1">
-                                <p className="text-gray-900 font-medium">Palavras-chave Principais</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedArticle.mainKeywords.map((keyword, index) => (
-                                    <span
-                                      key={index}
-                                      className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
-                                    >
-                                      {keyword}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div> */}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center">
-                    <div className="bg-gray-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                      <svg
-                        className="w-8 h-8 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-gray-500 font-medium mb-1">Selecione um artigo</p>
-                    <p className="text-gray-400 text-sm">para ver mais detalhes</p>
-                  </div>
-                )}
-              </div>
+            <div className="lg:col-span-1 fixed display: contents">
+              <ArticleDetails article={selectedArticle} />
             </div>
           </div>
         )}

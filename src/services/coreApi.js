@@ -4,7 +4,8 @@ const CORE_API_KEY = process.env.NEXT_PUBLIC_CORE_API_KEY;
 const CORE_API_URL = 'https://api.core.ac.uk/v3';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 10; // Tamanho da página no frontend
+const API_PAGE_SIZE = 50; // Tamanho da página na API
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -22,7 +23,46 @@ const makeRequest = async (requestFn, retryCount = 0) => {
   }
 };
 
+export const filterByYearRange = (items, yearRange = {}) => {
+  const { gte, lte } = yearRange;
+
+  return items.filter(item => {
+    const year = item.yearPublished;
+    if (!year) return false;
+
+    if (gte && year < gte) return false;
+    if (lte && year > lte) return false;
+
+    return true;
+  });
+};
+
+const normalize = (text) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ''); // remove pontuações
+
+export const filterByAuthorName = (items, authorName) => {
+  if (!authorName) return items;
+
+  const targetTokens = normalize(authorName).split(/\s+/).filter(Boolean);
+
+  return items.filter(item =>
+    Array.isArray(item.authors) &&
+    item.authors.some(author => {
+      const authorTokens = normalize(author.name || '').split(/\s+/).filter(Boolean);
+
+      // Verifica se todos os tokens do filtro estão no nome do autor
+      return targetTokens.every(token => authorTokens.includes(token));
+    })
+  );
+};
+
 export const searchArticles = async (query, filters = {}, page = 1) => {
+  console.log('searchArticles chamada com:', { query, filters, page });
+  
   if (!CORE_API_KEY) {
     throw new Error('Chave da API do CORE não configurada. Configure a variável de ambiente NEXT_PUBLIC_CORE_API_KEY.');
   }
@@ -34,25 +74,23 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
   try {
     const requestBody = {
       q: query.trim(),
-      limit: PAGE_SIZE,
-      offset: Math.max(0, (page - 1) * PAGE_SIZE),
+      limit: API_PAGE_SIZE,
+      offset: Math.max(0, (page - 1) * API_PAGE_SIZE),
       filters: {}
     };
-
-    // Adiciona filtros apenas se forem fornecidos
+    
+    // Filtro por ano - aplicar diretamente na API
     if (filters.year) {
-      const year = parseInt(filters.year);
-      if (!isNaN(year) && year > 0) {
-        requestBody.filters.yearPublished = {
-          gte: year,
-          lte: year
-        };
-      }
+      const year = parseInt(filters.year, 10);
+      requestBody.filters.yearPublished = { gte: year, lte: year };
     }
 
+    // Filtro por autor - aplicar diretamente na API
     if (filters.author && filters.author.trim() !== '') {
       requestBody.filters.authors = [filters.author.trim()];
     }
+
+    console.log('Requisição para API:', requestBody);
 
     const response = await makeRequest(() => 
       axios.post(
@@ -63,19 +101,28 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
             'Authorization': `Bearer ${CORE_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          timeout: 20000 // Aumentado para 20 segundos
+          timeout: 20000
         }
       )
     );
+
+    console.log('Resposta da API:', {
+      totalHits: response.data.totalHits,
+      resultsCount: response.data.results?.length,
+      page: page
+    });
 
     if (!response.data || !Array.isArray(response.data.results)) {
       throw new Error('Resposta inválida da API do CORE');
     }
 
-    // Transformar a resposta para o formato esperado
-    console.log(response.data.results)
+    const rawResults = response.data?.results || [];
+    const actualResultsCount = rawResults.length;
+    const totalHitsFromAPI = response.data.totalHits || 0;
+
     return {
-      data: response.data.results.map(work => ({
+      data: rawResults.map(work => ({
+        
         title: work.title || 'Sem título',
         authors: Array.isArray(work.authors) ? work.authors.map(author => author.name || 'Autor desconhecido') : ['Autor desconhecido'],
         year: work.yearPublished || new Date().getFullYear(),
@@ -92,10 +139,11 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
         participants: work.participants || undefined,
         mainKeywords: work.mainKeywords || []
       })),
-      totalHits: response.data.totalHits || 0,
+      totalHits: actualResultsCount, // Usar o número real de resultados
       page,
       pageSize: PAGE_SIZE,
-      totalPages: Math.ceil((response.data.totalHits || 0) / PAGE_SIZE)
+      totalPages: Math.ceil(actualResultsCount / PAGE_SIZE),
+      hasMoreResults: totalHitsFromAPI > actualResultsCount // Indicar se há mais resultados disponíveis
     };
   } catch (error) {
     if (error.response) {
