@@ -32,7 +32,7 @@ export const ArticleList: React.FC<ArticleListProps> = ({
         {articles.map((article) => (
           <div
             key={article.id}
-            className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer bg-white"
+            className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer bg-white hover:bg-gray-50"
             onClick={() => onSelect(article)}
           >
             <h3 className="text-xl font-semibold mb-3 text-gray-900 hover:text-blue-600 transition-colors">

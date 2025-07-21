@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { searchArticles } from '../services/coreApi';
 import { analyzeArticle } from '../services/aiAnalysis';
 import { ArticleDetails } from '@/components/ArticleDetails';
 import { SearchFormCard } from '@/components/SearchFormCard';
 import { ArticleList } from '@/components/ArticleList';
 import { Pagination } from '@/components/Pagination';
+import { YearFilter } from '@/components/YearFilter';
 
 interface Article {
   id: string;
@@ -63,6 +64,37 @@ export default function Home() {
   const [, setAnalyzing] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false); // Se há mais resultados disponíveis
   const [filterInfo, setFilterInfo] = useState<string | null>(null); // Informação sobre filtros aplicados
+  const [selectedYears, setSelectedYears] = useState<number[]>([]);
+
+  // Anos únicos dos artigos carregados
+  const availableYears = useMemo(() => {
+    const years = allArticles.map(a => a.year).filter(Boolean);
+    return Array.from(new Set(years)).sort((a, b) => b - a);
+  }, [allArticles]);
+
+  // Artigos filtrados localmente por ano (aplicar sobre allArticles)
+  const filteredByYearArticles = useMemo(() => {
+    if (selectedYears.length === 0) return allArticles;
+    return allArticles.filter(a => selectedYears.includes(a.year));
+  }, [allArticles, selectedYears]);
+
+  // Paginação local após filtro de ano
+  const articlesPerPage = 10;
+  const paginatedArticles = useMemo(() => {
+    const startIndex = (currentPage - 1) * articlesPerPage;
+    const endIndex = startIndex + articlesPerPage;
+    return filteredByYearArticles.slice(startIndex, endIndex);
+  }, [filteredByYearArticles, currentPage]);
+
+  // Atualizar totalPages e totalResults dinamicamente
+  useEffect(() => {
+    setTotalPages(Math.ceil(filteredByYearArticles.length / articlesPerPage));
+    setTotalResults(filteredByYearArticles.length);
+    // Se a página atual ficou inválida, volta para a primeira
+    if ((currentPage - 1) * articlesPerPage >= filteredByYearArticles.length && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [filteredByYearArticles, currentPage]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +147,8 @@ export default function Home() {
 
   const handlePageChange = async (newPage: number) => {
     console.log('Mudando para página:', newPage);
+
+    setSelectedArticle(null);
     
     // Calcular quantos artigos já temos carregados
     const articlesPerPage = 10;
@@ -199,6 +233,14 @@ export default function Home() {
     }
   };
 
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSearchYear('');
+    setSearchAuthor('');
+    setPortugueseOnly(false);
+    setSelectedYears([]);
+  };
+
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -215,6 +257,7 @@ export default function Home() {
           onSearchAuthorChange={setSearchAuthor}
           onPortugueseOnlyChange={setPortugueseOnly}
           onSubmit={handleSearch}
+          onClearFilters={handleClearFilters}
         />
 
         {error && (
@@ -231,12 +274,12 @@ export default function Home() {
           </div>
         )}
         
-        {articles.length > 0 && (
+        {filteredByYearArticles.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
                 <ArticleList
-                  articles={articles}
+                  articles={paginatedArticles}
                   totalResults={totalResults}
                   onSelect={handleArticleSelect}
                 />
@@ -260,13 +303,16 @@ export default function Home() {
               />
             </div>
 
-            <div className="lg:col-span-1 fixed display: contents">
-              <ArticleDetails article={selectedArticle} />
+            <div className="lg:col-span-1">
+              <div className="sticky top-8 flex flex-col gap-6">
+                <YearFilter years={availableYears} selectedYears={selectedYears} onChange={setSelectedYears} />
+                <ArticleDetails article={selectedArticle} />
+              </div>
             </div>
           </div>
         )}
 
-        {!loading && articles.length === 0 && !error && (
+        {!loading && filteredByYearArticles.length === 0 && !error && (
           <div className="text-center py-12 bg-white rounded-lg shadow-md">
             <p className="text-gray-500 text-lg mb-2">Nenhum resultado encontrado</p>
             <p className="text-gray-400">Faça uma busca para ver os artigos</p>

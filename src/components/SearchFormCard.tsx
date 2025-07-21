@@ -13,6 +13,7 @@ interface SearchFormCardProps {
   onSearchAuthorChange: (value: string) => void;
   onPortugueseOnlyChange: (value: boolean) => void;
   onSubmit: (e: React.FormEvent) => void;
+  onClearFilters: () => void;
 }
 
 export const SearchFormCard: React.FC<SearchFormCardProps> = ({
@@ -26,6 +27,7 @@ export const SearchFormCard: React.FC<SearchFormCardProps> = ({
   onSearchAuthorChange,
   onPortugueseOnlyChange,
   onSubmit,
+  onClearFilters,
 }) => {
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -97,13 +99,21 @@ export const SearchFormCard: React.FC<SearchFormCardProps> = ({
           </label>
         </div>
         
-        <div className="flex justify-center">
+        <div className="flex flex-col md:flex-row justify-center gap-4">
           <button
             type="submit"
             disabled={loading}
             className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium text-lg shadow-sm hover:shadow-md"
           >
             {loading ? 'Buscando...' : 'Buscar Artigos'}
+          </button>
+          <button
+            type="button"
+            onClick={onClearFilters}
+            disabled={loading}
+            className="px-8 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-colors font-medium text-lg shadow-sm hover:shadow-md"
+          >
+            Limpar filtros
           </button>
         </div>
       </form>
