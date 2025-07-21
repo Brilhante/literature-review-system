@@ -29,6 +29,7 @@ interface Article {
 interface SearchFilters {
   year?: string;
   author?: string;
+  portugueseOnly?: boolean;
 }
 
 interface ApiArticle {
@@ -54,23 +55,27 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchYear, setSearchYear] = useState('');
   const [searchAuthor, setSearchAuthor] = useState('');
+  const [portugueseOnly, setPortugueseOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [, setAnalyzing] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false); // Se há mais resultados disponíveis
+  const [filterInfo, setFilterInfo] = useState<string | null>(null); // Informação sobre filtros aplicados
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setFilterInfo(null);
     setCurrentPage(1);
 
     try {
       const filters: SearchFilters = {};
       if (searchYear) filters.year = searchYear;
       if (searchAuthor) filters.author = searchAuthor;
+      if (portugueseOnly) filters.portugueseOnly = true;
 
       const results = await searchArticles(searchTerm, filters, 1);
       const articlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
@@ -86,6 +91,15 @@ export default function Home() {
       setTotalPages(Math.ceil(results.totalHits / 10));
       setTotalResults(results.totalHits);
       setSelectedArticle(null);
+      
+      // Mostrar informação sobre filtros se aplicados
+      if (searchYear || searchAuthor || portugueseOnly) {
+        const filterMessages = [];
+        if (searchYear) filterMessages.push(`ano: ${searchYear}`);
+        if (searchAuthor) filterMessages.push(`autor: "${searchAuthor}"`);
+        if (portugueseOnly) filterMessages.push('apenas português');
+        setFilterInfo(`Filtros aplicados: ${filterMessages.join(', ')}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao buscar artigos');
       setArticles([]);
@@ -93,6 +107,7 @@ export default function Home() {
       setTotalPages(0);
       setTotalResults(0);
       setHasMoreResults(false);
+      setFilterInfo(null);
     } finally {
       setLoading(false);
     }
@@ -128,6 +143,7 @@ export default function Home() {
       const filters: SearchFilters = {};
       if (searchYear) filters.year = searchYear;
       if (searchAuthor) filters.author = searchAuthor;
+      if (portugueseOnly) filters.portugueseOnly = true;
 
       // Calcular qual página da API precisamos buscar
       const apiPage = Math.ceil((newPage * articlesPerPage) / 50);
@@ -192,10 +208,12 @@ export default function Home() {
           searchTerm={searchTerm}
           searchYear={searchYear}
           searchAuthor={searchAuthor}
+          portugueseOnly={portugueseOnly}
           loading={loading}
           onSearchTermChange={setSearchTerm}
           onSearchYearChange={setSearchYear}
           onSearchAuthorChange={setSearchAuthor}
+          onPortugueseOnlyChange={setPortugueseOnly}
           onSubmit={handleSearch}
         />
 
@@ -205,14 +223,33 @@ export default function Home() {
             <p>{error}</p>
           </div>
         )}
+        
+        {filterInfo && (
+          <div className="mb-6 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg shadow-sm">
+            <p className="font-medium">Informação:</p>
+            <p>{filterInfo}</p>
+          </div>
+        )}
+        
         {articles.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
-              <ArticleList
-                articles={articles}
-                totalResults={totalResults}
-                onSelect={handleArticleSelect}
-              />
+              <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+                <ArticleList
+                  articles={articles}
+                  totalResults={totalResults}
+                  onSelect={handleArticleSelect}
+                />
+              </div>
+
+              {loading && (
+                <div className="mt-4 flex justify-center">
+                  <div className="flex items-center space-x-2 text-blue-600">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <span className="text-sm font-medium">Carregando...</span>
+                  </div>
+                </div>
+              )}
 
               <Pagination
                 currentPage={currentPage}

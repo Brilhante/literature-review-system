@@ -6,10 +6,12 @@ interface SearchFormCardProps {
   searchTerm: string;
   searchYear: string;
   searchAuthor: string;
+  portugueseOnly: boolean;
   loading: boolean;
   onSearchTermChange: (value: string) => void;
   onSearchYearChange: (value: string) => void;
   onSearchAuthorChange: (value: string) => void;
+  onPortugueseOnlyChange: (value: boolean) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -17,15 +19,17 @@ export const SearchFormCard: React.FC<SearchFormCardProps> = ({
   searchTerm,
   searchYear,
   searchAuthor,
+  portugueseOnly,
   loading,
   onSearchTermChange,
   onSearchYearChange,
   onSearchAuthorChange,
+  onPortugueseOnlyChange,
   onSubmit,
 }) => {
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
@@ -69,6 +73,30 @@ export const SearchFormCard: React.FC<SearchFormCardProps> = ({
             />
           </div>
         </div>
+        
+        <div className="flex items-center justify-center">
+          <label className="flex items-center cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={portugueseOnly}
+                onChange={(e) => onPortugueseOnlyChange(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`block w-14 h-8 rounded-full transition-colors duration-200 ease-in-out ${
+                portugueseOnly ? 'bg-blue-600' : 'bg-gray-300'
+              }`}>
+                <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 ease-in-out transform ${
+                  portugueseOnly ? 'translate-x-6' : 'translate-x-0'
+                }`}></div>
+              </div>
+            </div>
+            <span className="ml-3 text-sm font-medium text-gray-700">
+              Apenas artigos em português
+            </span>
+          </label>
+        </div>
+        
         <div className="flex justify-center">
           <button
             type="submit"

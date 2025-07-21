@@ -26,7 +26,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             onClick={() => onPageChange(currentPage - 1)}
             disabled={loading}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium cursor-pointer"
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-all duration-200 ease-in-out font-medium cursor-pointer transform hover:scale-105 active:scale-95"
           >
             ← Anterior
           </button>
@@ -38,14 +38,14 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             onClick={() => onPageChange(currentPage + 1)}
             disabled={loading}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium cursor-pointer"
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-all duration-200 ease-in-out font-medium cursor-pointer transform hover:scale-105 active:scale-95"
           >
             Próxima →
           </button>
         )}
       </div>
       {!hasMoreResults && currentPage === totalPages && (
-        <div className="mt-4 text-center text-sm text-gray-500">
+        <div className="mt-4 text-center text-sm text-gray-500 animate-fade-in">
           Todos os resultados disponíveis foram carregados
         </div>
       )}
