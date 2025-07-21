@@ -49,7 +49,7 @@ interface ApiArticle {
 }
 
 export default function Home() {
-  const [articles, setArticles] = useState<Article[]>([]);
+  // Removido: const [articles, setArticles] = useState<Article[]>([]);
   const [allArticles, setAllArticles] = useState<Article[]>([]); // Todos os artigos da API
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,13 +117,13 @@ export default function Home() {
 
       setAllArticles(articlesWithIds);
       setHasMoreResults(results.hasMoreResults);
-      
+
       // Mostrar apenas os primeiros 10 artigos
-      setArticles(articlesWithIds.slice(0, 10));
+      // setArticles(articlesWithIds.slice(0, 10)); // Removido
       setTotalPages(Math.ceil(results.totalHits / 10));
       setTotalResults(results.totalHits);
       setSelectedArticle(null);
-      
+
       // Mostrar informação sobre filtros se aplicados
       if (searchYear || searchAuthor || portugueseOnly) {
         const filterMessages = [];
@@ -134,7 +134,7 @@ export default function Home() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao buscar artigos');
-      setArticles([]);
+      // setArticles([]); // Removido
       setAllArticles([]);
       setTotalPages(0);
       setTotalResults(0);
@@ -149,30 +149,30 @@ export default function Home() {
     console.log('Mudando para página:', newPage);
 
     setSelectedArticle(null);
-    
+
     // Calcular quantos artigos já temos carregados
     const articlesPerPage = 10;
     const totalLoadedArticles = allArticles.length;
     const maxLocalPages = Math.ceil(totalLoadedArticles / articlesPerPage);
-    
+
     // Se a página solicitada está dentro dos artigos já carregados
     if (newPage <= maxLocalPages) {
       setCurrentPage(newPage);
-      const startIndex = (newPage - 1) * articlesPerPage;
-      const endIndex = startIndex + articlesPerPage;
-      setArticles(allArticles.slice(startIndex, endIndex));
+      // Removido: const startIndex = (newPage - 1) * articlesPerPage;
+      // Removido: const endIndex = startIndex + articlesPerPage;
+      // Removido: setArticles(allArticles.slice(startIndex, endIndex));
       return;
     }
-    
+
     // Se precisamos buscar mais artigos da API e há mais resultados disponíveis
     if (!hasMoreResults) {
       console.log('Não há mais resultados disponíveis');
       return;
     }
-    
+
     setLoading(true);
     setCurrentPage(newPage);
-    
+
     try {
       const filters: SearchFilters = {};
       if (searchYear) filters.year = searchYear;
@@ -182,7 +182,7 @@ export default function Home() {
       // Calcular qual página da API precisamos buscar
       const apiPage = Math.ceil((newPage * articlesPerPage) / 50);
       console.log('Buscando artigos da API, página:', apiPage);
-      
+
       const results = await searchArticles(searchTerm, filters, apiPage);
       const newArticlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
         ...article,
@@ -193,16 +193,16 @@ export default function Home() {
       const updatedAllArticles = [...allArticles, ...newArticlesWithIds];
       setAllArticles(updatedAllArticles);
       setHasMoreResults(results.hasMoreResults);
-      
+
       // Atualizar total de resultados
       setTotalResults(updatedAllArticles.length);
       setTotalPages(Math.ceil(updatedAllArticles.length / articlesPerPage));
-      
+
       // Mostrar a página solicitada
-      const startIndex = (newPage - 1) * articlesPerPage;
-      const endIndex = startIndex + articlesPerPage;
-      setArticles(updatedAllArticles.slice(startIndex, endIndex));
-      
+      // Removido: const startIndex = (newPage - 1) * articlesPerPage;
+      // Removido: const endIndex = startIndex + articlesPerPage;
+      // Removido: setArticles(updatedAllArticles.slice(startIndex, endIndex));
+
     } catch (err) {
       console.error('Erro na paginação:', err);
       setError(err instanceof Error ? err.message : 'Erro ao buscar artigos');
@@ -266,15 +266,24 @@ export default function Home() {
             <p>{error}</p>
           </div>
         )}
-        
+
         {filterInfo && (
           <div className="mb-6 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg shadow-sm">
             <p className="font-medium">Informação:</p>
             <p>{filterInfo}</p>
           </div>
         )}
-        
-        {filteredByYearArticles.length > 0 && (
+
+        {loading && (
+          <div className="mt-4 flex justify-center">
+            <div className="flex items-center space-x-2 text-blue-600">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="text-sm font-medium">Carregando...</span>
+            </div>
+          </div>
+        )}
+
+        {!loading && filteredByYearArticles.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
@@ -284,15 +293,6 @@ export default function Home() {
                   onSelect={handleArticleSelect}
                 />
               </div>
-
-              {loading && (
-                <div className="mt-4 flex justify-center">
-                  <div className="flex items-center space-x-2 text-blue-600">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    <span className="text-sm font-medium">Carregando...</span>
-                  </div>
-                </div>
-              )}
 
               <Pagination
                 currentPage={currentPage}

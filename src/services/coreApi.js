@@ -5,7 +5,7 @@ const CORE_API_URL = 'https://api.core.ac.uk/v3';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 const PAGE_SIZE = 10; // Tamanho da página no frontend
-const API_PAGE_SIZE = 50; // Tamanho da página na API
+const API_PAGE_SIZE = 30; // Tamanho da página na API
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -60,7 +60,23 @@ export const filterByAuthorName = (items, authorName) => {
   );
 };
 
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hora em ms
+const searchCache = {};
+
+function getCacheKey(query, filters, page) {
+  return JSON.stringify({ query, filters, page });
+}
+
 export const searchArticles = async (query, filters = {}, page = 1) => {
+  const cacheKey = getCacheKey(query, filters, page);
+  const now = Date.now();
+
+  // Verifica cache
+  if (searchCache[cacheKey] && (now - searchCache[cacheKey].timestamp < CACHE_DURATION)) {
+    console.log('Retornando resultado do cache');
+    return searchCache[cacheKey].data;
+  }
+
   console.log('searchArticles chamada com:', { query, filters, page });
   
   if (!CORE_API_KEY) {
@@ -235,7 +251,7 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     }
   }
 
-  return {
+  const result = {
     data: filteredResults.map(work => ({
       
       title: work.title || 'Sem título',
@@ -260,6 +276,13 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     totalPages: Math.ceil(filteredResults.length / PAGE_SIZE),
     hasMoreResults: totalHitsFromAPI > actualResultsCount // Indicar se há mais resultados disponíveis
   };
+
+  searchCache[cacheKey] = {
+    data: result,
+    timestamp: now
+  };
+
+  return result;
 };
 
 export const getArticleDetails = async (articleId) => {
