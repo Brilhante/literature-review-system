@@ -96,13 +96,11 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
       filters: {}
     };
     
-    // Filtro por ano - aplicar diretamente na API
     if (filters.year) {
       const year = parseInt(filters.year, 10);
       requestBody.filters.yearPublished = { gte: year, lte: year };
     }
 
-    // Filtro por autor - aplicar diretamente na API
     if (filters.author && filters.author.trim() !== '') {
       requestBody.filters.authors = [filters.author.trim()];
     }
@@ -124,7 +122,6 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     );
     responseData = response.data;
   } catch (error) {
-    // Se vier dados válidos mesmo com erro, processa e retorna
     if (error.response && error.response.data && Array.isArray(error.response.data.results)) {
       responseData = error.response.data;
     } else {
@@ -150,7 +147,6 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     }
   }
 
-  // --- Lógica de processamento dos dados (igual ao que já existe) ---
   if (!responseData || !Array.isArray(responseData.results)) {
     throw new Error('Resposta inválida da API do CORE');
   }
@@ -159,10 +155,8 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
   const actualResultsCount = rawResults.length;
   const totalHitsFromAPI = responseData.totalHits || 0;
 
-  // Aplicar filtros localmente como fallback se a API não aplicou corretamente
   let filteredResults = rawResults;
   
-  // Filtro por ano local
   if (filters.year) {
     const year = parseInt(filters.year, 10);
     filteredResults = filteredResults.filter(item => {
@@ -171,7 +165,6 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     });
   }
   
-  // Filtro por autor local
   if (filters.author && filters.author.trim() !== '') {
     const targetAuthor = filters.author.trim().toLowerCase();
     filteredResults = filteredResults.filter(item => {
@@ -183,7 +176,6 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     });
   }
   
-  // Filtro por idioma português
   if (filters.portugueseOnly) {
     filteredResults = filteredResults.filter(item => {
       return item.language && item.language.code === 'pt';
@@ -196,11 +188,9 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     filters: filters
   });
 
-  // Se não encontrou resultados com filtros, tentar busca mais ampla
   if (filteredResults.length === 0 && (filters.year || filters.author)) {
     console.log('Nenhum resultado encontrado com filtros, tentando busca mais ampla...');
     
-    // Tentar busca sem filtros de autor, mas mantendo o ano
     const fallbackRequestBody = {
       q: query.trim(),
       limit: API_PAGE_SIZE,
@@ -230,7 +220,6 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
     if (fallbackResponse.data && Array.isArray(fallbackResponse.data.results)) {
       const fallbackResults = fallbackResponse.data.results;
       
-      // Aplicar filtros localmente nos resultados da busca mais ampla
       if (filters.author && filters.author.trim() !== '') {
         const targetAuthor = filters.author.trim().toLowerCase();
         filteredResults = fallbackResults.filter(item => {
@@ -270,11 +259,11 @@ export const searchArticles = async (query, filters = {}, page = 1) => {
       participants: work.participants || undefined,
       mainKeywords: work.mainKeywords || []
     })),
-    totalHits: filteredResults.length, // Usar o número de resultados filtrados
+    totalHits: filteredResults.length,
     page,
     pageSize: PAGE_SIZE,
     totalPages: Math.ceil(filteredResults.length / PAGE_SIZE),
-    hasMoreResults: totalHitsFromAPI > actualResultsCount // Indicar se há mais resultados disponíveis
+    hasMoreResults: totalHitsFromAPI > actualResultsCount
   };
 
   searchCache[cacheKey] = {

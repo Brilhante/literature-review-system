@@ -57,7 +57,7 @@ export const SearchFormCard: React.FC<SearchFormCardProps> = ({
               onChange={(e) => onSearchYearChange(e.target.value)}
               placeholder="Ex: 2023"
               min="1900"
-              max={new Date().getFullYear()}
+              max="2030"
               className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
           </div>

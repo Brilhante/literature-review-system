@@ -19,10 +19,8 @@ export const analyzeArticle = async (fullText) => {
       body: JSON.stringify({ fullText }),
     });
 
-    // Tenta ler o corpo da resposta como texto primeiro
     const responseText = await response.text();
 
-    // Verifica se a resposta é HTML (erro 404 ou similar)
     if (responseText.trim().toLowerCase().startsWith('<!doctype html>')) {
       throw new Error('API não encontrada. Verifique se o servidor está rodando e se a rota está correta.');
     }

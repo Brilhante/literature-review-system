@@ -8,7 +8,6 @@ export async function POST(request: Request) {
   console.log('API Route: Iniciando processamento da requisição');
   
   try {
-    // Verifica o método da requisição
     if (request.method !== 'POST') {
       console.log('API Route: Método não permitido');
       return new NextResponse(
@@ -22,7 +21,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Tenta fazer o parse do corpo da requisição
     let fullText;
     try {
       const body = await request.json();

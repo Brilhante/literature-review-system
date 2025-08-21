@@ -61,10 +61,15 @@ export default function Home() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [, setAnalyzing] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false); // Se há mais resultados disponíveis
   const [filterInfo, setFilterInfo] = useState<string | null>(null); // Informação sobre filtros aplicados
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  // Garantir que componentes dinâmicos só renderizem no cliente
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Anos únicos dos artigos carregados
   const availableYears = useMemo(() => {
@@ -90,7 +95,7 @@ export default function Home() {
   useEffect(() => {
     setTotalPages(Math.ceil(filteredByYearArticles.length / articlesPerPage));
     setTotalResults(filteredByYearArticles.length);
-    // Se a página atual ficou inválida, volta para a primeira
+
     if ((currentPage - 1) * articlesPerPage >= filteredByYearArticles.length && currentPage !== 1) {
       setCurrentPage(1);
     }
@@ -112,14 +117,11 @@ export default function Home() {
       const results = await searchArticles(searchTerm, filters, 1);
       const articlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
         ...article,
-        id: `${article.title}-${article.year}-${index}-${Date.now()}`
+        id: `${article.title.slice(0, 50).replace(/[^a-zA-Z0-9]/g, '')}-${article.year}-${index}`
       }));
 
       setAllArticles(articlesWithIds);
       setHasMoreResults(results.hasMoreResults);
-
-      // Mostrar apenas os primeiros 10 artigos
-      // setArticles(articlesWithIds.slice(0, 10)); // Removido
       setTotalPages(Math.ceil(results.totalHits / 10));
       setTotalResults(results.totalHits);
       setSelectedArticle(null);
@@ -134,7 +136,6 @@ export default function Home() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao buscar artigos');
-      // setArticles([]); // Removido
       setAllArticles([]);
       setTotalPages(0);
       setTotalResults(0);
@@ -155,16 +156,11 @@ export default function Home() {
     const totalLoadedArticles = allArticles.length;
     const maxLocalPages = Math.ceil(totalLoadedArticles / articlesPerPage);
 
-    // Se a página solicitada está dentro dos artigos já carregados
     if (newPage <= maxLocalPages) {
       setCurrentPage(newPage);
-      // Removido: const startIndex = (newPage - 1) * articlesPerPage;
-      // Removido: const endIndex = startIndex + articlesPerPage;
-      // Removido: setArticles(allArticles.slice(startIndex, endIndex));
       return;
     }
 
-    // Se precisamos buscar mais artigos da API e há mais resultados disponíveis
     if (!hasMoreResults) {
       console.log('Não há mais resultados disponíveis');
       return;
@@ -179,17 +175,15 @@ export default function Home() {
       if (searchAuthor) filters.author = searchAuthor;
       if (portugueseOnly) filters.portugueseOnly = true;
 
-      // Calcular qual página da API precisamos buscar
       const apiPage = Math.ceil((newPage * articlesPerPage) / 50);
       console.log('Buscando artigos da API, página:', apiPage);
 
       const results = await searchArticles(searchTerm, filters, apiPage);
       const newArticlesWithIds = results.data.map((article: ApiArticle, index: number) => ({
         ...article,
-        id: `${article.title}-${article.year}-${index}-${Date.now()}`
+        id: `${article.title.slice(0, 50).replace(/[^a-zA-Z0-9]/g, '')}-${article.year}-${index + allArticles.length}`
       }));
 
-      // Adicionar novos artigos aos existentes
       const updatedAllArticles = [...allArticles, ...newArticlesWithIds];
       setAllArticles(updatedAllArticles);
       setHasMoreResults(results.hasMoreResults);
@@ -197,11 +191,6 @@ export default function Home() {
       // Atualizar total de resultados
       setTotalResults(updatedAllArticles.length);
       setTotalPages(Math.ceil(updatedAllArticles.length / articlesPerPage));
-
-      // Mostrar a página solicitada
-      // Removido: const startIndex = (newPage - 1) * articlesPerPage;
-      // Removido: const endIndex = startIndex + articlesPerPage;
-      // Removido: setArticles(updatedAllArticles.slice(startIndex, endIndex));
 
     } catch (err) {
       console.error('Erro na paginação:', err);
@@ -213,7 +202,6 @@ export default function Home() {
 
   const handleArticleSelect = async (article: Article) => {
     setSelectedArticle(article);
-    setAnalyzing(true);
 
     try {
       if (article.fullText) {
@@ -228,8 +216,6 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Erro ao analisar artigo:', error);
-    } finally {
-      setAnalyzing(false);
     }
   };
 
@@ -283,7 +269,7 @@ export default function Home() {
           </div>
         )}
 
-        {!loading && filteredByYearArticles.length > 0 && (
+        {isClient && !loading && filteredByYearArticles.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
@@ -312,7 +298,7 @@ export default function Home() {
           </div>
         )}
 
-        {!loading && filteredByYearArticles.length === 0 && !error && (
+        {isClient && !loading && filteredByYearArticles.length === 0 && !error && (
           <div className="text-center py-12 bg-white rounded-lg shadow-md">
             <p className="text-gray-500 text-lg mb-2">Nenhum resultado encontrado</p>
             <p className="text-gray-400">Faça uma busca para ver os artigos</p>
