@@ -4,8 +4,8 @@ const CORE_API_KEY = process.env.NEXT_PUBLIC_CORE_API_KEY;
 const CORE_API_URL = 'https://api.core.ac.uk/v3';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
-const PAGE_SIZE = 10; // Tamanho da página no frontend
-const API_PAGE_SIZE = 30; // Tamanho da página na API
+const PAGE_SIZE = 10;
+const API_PAGE_SIZE = 30;
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
