@@ -9,8 +9,8 @@ export const analyzeArticle = async (fullText) => {
   }
 
   try {
-    // Usando o caminho absoluto para a API
-    const response = await fetch(`${window.location.origin}/api/analyze`, {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
+    const response = await fetch(`${backendUrl}/api/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

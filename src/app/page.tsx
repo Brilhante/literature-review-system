@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { searchArticles } from '../services/coreApi';
-import { analyzeArticle } from '../services/aiAnalysis';
+import { analyzeArticle } from '../services/analysisApi';
 import { ArticleDetails } from '@/components/ArticleDetails';
 import { SearchFormCard } from '@/components/SearchFormCard';
 import { ArticleList } from '@/components/ArticleList';

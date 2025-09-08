@@ -1,33 +1,65 @@
-import axios from 'axios';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
-const CORE_API_KEY = process.env.NEXT_PUBLIC_CORE_API_KEY;
-const CORE_API_URL = 'https://api.core.ac.uk/v3';
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;
-const PAGE_SIZE = 10;
-const API_PAGE_SIZE = 30;
+export const searchArticles = async (query, filters = {}, page = 1) => {
+  console.log('searchArticles chamada com:', { query, filters, page });
+  
+  if (!query || query.trim() === '') {
+    throw new Error('A consulta de busca não pode estar vazia.');
+  }
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const makeRequest = async (requestFn, retryCount = 0) => {
   try {
-    return await requestFn();
-  } catch (error) {
-    if (retryCount < MAX_RETRIES && (error.response?.status === 500 || error.response?.status === 429)) {
-      const delay = RETRY_DELAY * Math.pow(2, retryCount); // Backoff exponencial
-      console.log(`Tentativa ${retryCount + 1} falhou, tentando novamente em ${delay}ms...`);
-      await sleep(delay);
-      return makeRequest(requestFn, retryCount + 1);
+    const response = await fetch(`${BACKEND_URL}/api/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: query.trim(),
+        filters,
+        page
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erro na busca de artigos');
     }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro na busca de artigos:', error);
     throw error;
   }
 };
 
+export const getArticleDetails = async (articleId) => {
+  if (!articleId) {
+    throw new Error('ID do artigo não fornecido');
+  }
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/articles/${articleId}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erro ao buscar detalhes do artigo');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar detalhes do artigo:', error);
+    throw error;
+  }
+};
+
+// Funções auxiliares mantidas para compatibilidade
 export const filterByYearRange = (items, yearRange = {}) => {
   const { gte, lte } = yearRange;
 
   return items.filter(item => {
-    const year = item.yearPublished;
+    const year = item.year; // Usar 'year' em vez de 'yearPublished'
     if (!year) return false;
 
     if (gte && year < gte) return false;
@@ -52,294 +84,10 @@ export const filterByAuthorName = (items, authorName) => {
   return items.filter(item =>
     Array.isArray(item.authors) &&
     item.authors.some(author => {
-      const authorTokens = normalize(author.name || '').split(/\s+/).filter(Boolean);
+      const authorTokens = normalize(author || '').split(/\s+/).filter(Boolean);
 
       // Verifica se todos os tokens do filtro estão no nome do autor
       return targetTokens.every(token => authorTokens.includes(token));
     })
   );
 };
-
-const CACHE_DURATION = 1000 * 60 * 60; // 1 hora em ms
-const searchCache = {};
-
-function getCacheKey(query, filters, page) {
-  return JSON.stringify({ query, filters, page });
-}
-
-export const searchArticles = async (query, filters = {}, page = 1) => {
-  const cacheKey = getCacheKey(query, filters, page);
-  const now = Date.now();
-
-  // Verifica cache
-  if (searchCache[cacheKey] && (now - searchCache[cacheKey].timestamp < CACHE_DURATION)) {
-    console.log('Retornando resultado do cache');
-    return searchCache[cacheKey].data;
-  }
-
-  console.log('searchArticles chamada com:', { query, filters, page });
-  
-  if (!CORE_API_KEY) {
-    throw new Error('Chave da API do CORE não configurada. Configure a variável de ambiente NEXT_PUBLIC_CORE_API_KEY.');
-  }
-
-  if (!query || query.trim() === '') {
-    throw new Error('A consulta de busca não pode estar vazia.');
-  }
-
-  let responseData = null;
-  try {
-    const requestBody = {
-      q: query.trim(),
-      limit: API_PAGE_SIZE,
-      offset: Math.max(0, (page - 1) * API_PAGE_SIZE),
-      filters: {}
-    };
-    
-    if (filters.year) {
-      const year = parseInt(filters.year, 10);
-      requestBody.filters.yearPublished = { gte: year, lte: year };
-    }
-
-    if (filters.author && filters.author.trim() !== '') {
-      requestBody.filters.authors = [filters.author.trim()];
-    }
-
-    console.log('Requisição para API:', requestBody);
-
-    const response = await makeRequest(() => 
-      axios.post(
-        `${CORE_API_URL}/search/works`,
-        requestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${CORE_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 20000
-        }
-      )
-    );
-    responseData = response.data;
-  } catch (error) {
-    if (error.response && error.response.data && Array.isArray(error.response.data.results)) {
-      responseData = error.response.data;
-    } else {
-      if (error.response) {
-        console.error('Erro na resposta da API do CORE:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-        if (error.response.status === 500) {
-          throw new Error('A API do CORE está temporariamente indisponível. Por favor, tente novamente em alguns instantes.');
-        }
-        if (error.response.status === 429) {
-          throw new Error('Muitas requisições em um curto período. Por favor, aguarde alguns instantes antes de tentar novamente.');
-        }
-        throw new Error(`Erro na API do CORE: ${error.response.status} - ${error.response.data?.message || 'Erro desconhecido'}`);
-      } else if (error.request) {
-        console.error('Sem resposta da API do CORE:', error.request);
-        throw new Error('Não foi possível conectar com a API do CORE. Verifique sua conexão com a internet.');
-      } else {
-        console.error('Erro ao configurar requisição para a API do CORE:', error.message);
-        throw new Error(`Erro ao buscar artigos: ${error.message}`);
-      }
-    }
-  }
-
-  if (!responseData || !Array.isArray(responseData.results)) {
-    throw new Error('Resposta inválida da API do CORE');
-  }
-
-  const rawResults = responseData?.results || [];
-  const actualResultsCount = rawResults.length;
-  const totalHitsFromAPI = responseData.totalHits || 0;
-
-  let filteredResults = rawResults;
-  
-  if (filters.year) {
-    const year = parseInt(filters.year, 10);
-    filteredResults = filteredResults.filter(item => {
-      const itemYear = item.yearPublished;
-      return itemYear && itemYear === year;
-    });
-  }
-  
-  if (filters.author && filters.author.trim() !== '') {
-    const targetAuthor = filters.author.trim().toLowerCase();
-    filteredResults = filteredResults.filter(item => {
-      if (!Array.isArray(item.authors)) return false;
-      return item.authors.some(author => {
-        const authorName = (author.name || '').toLowerCase();
-        return authorName.includes(targetAuthor) || targetAuthor.includes(authorName);
-      });
-    });
-  }
-  
-  if (filters.portugueseOnly) {
-    filteredResults = filteredResults.filter(item => {
-      return item.language && item.language.code === 'pt';
-    });
-  }
-
-  console.log('Filtros aplicados:', {
-    originalCount: rawResults.length,
-    filteredCount: filteredResults.length,
-    filters: filters
-  });
-
-  if (filteredResults.length === 0 && (filters.year || filters.author)) {
-    console.log('Nenhum resultado encontrado com filtros, tentando busca mais ampla...');
-    
-    const fallbackRequestBody = {
-      q: query.trim(),
-      limit: API_PAGE_SIZE,
-      offset: Math.max(0, (page - 1) * API_PAGE_SIZE),
-      filters: {}
-    };
-    
-    if (filters.year) {
-      const year = parseInt(filters.year, 10);
-      fallbackRequestBody.filters.yearPublished = { gte: year, lte: year };
-    }
-    
-    const fallbackResponse = await makeRequest(() => 
-      axios.post(
-        `${CORE_API_URL}/search/works`,
-        fallbackRequestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${CORE_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 20000
-        }
-      )
-    );
-    
-    if (fallbackResponse.data && Array.isArray(fallbackResponse.data.results)) {
-      const fallbackResults = fallbackResponse.data.results;
-      
-      if (filters.author && filters.author.trim() !== '') {
-        const targetAuthor = filters.author.trim().toLowerCase();
-        filteredResults = fallbackResults.filter(item => {
-          if (!Array.isArray(item.authors)) return false;
-          return item.authors.some(author => {
-            const authorName = (author.name || '').toLowerCase();
-            return authorName.includes(targetAuthor) || targetAuthor.includes(authorName);
-          });
-        });
-      } else {
-        filteredResults = fallbackResults;
-      }
-      
-      console.log('Resultados da busca alternativa:', {
-        originalCount: fallbackResults.length,
-        filteredCount: filteredResults.length
-      });
-    }
-  }
-
-  const result = {
-    data: filteredResults.map(work => ({
-      
-      title: work.title || 'Sem título',
-      authors: Array.isArray(work.authors) ? work.authors.map(author => author.name || 'Autor desconhecido') : ['Autor desconhecido'],
-      year: work.yearPublished || new Date().getFullYear(),
-      abstract: work.abstract || 'Sem resumo disponível',
-      source: work.sourceFulltextUrl || work.source || 'Fonte não disponível',
-      url: work.downloadUrl || work.sourceFulltextUrl || '',
-      method: work.methodology || undefined,
-      location: work.location || undefined,
-      university: work.publisher || undefined,
-      journal: work.journals && work.journals.length > 0 ? work.journals[0].title : undefined,
-      type: work.type || undefined,
-      keywords: work.keywords || [],
-      fullText: work.fullText || undefined,
-      participants: work.participants || undefined,
-      mainKeywords: work.mainKeywords || []
-    })),
-    totalHits: filteredResults.length,
-    page,
-    pageSize: PAGE_SIZE,
-    totalPages: Math.ceil(filteredResults.length / PAGE_SIZE),
-    hasMoreResults: totalHitsFromAPI > actualResultsCount
-  };
-
-  searchCache[cacheKey] = {
-    data: result,
-    timestamp: now
-  };
-
-  return result;
-};
-
-export const getArticleDetails = async (articleId) => {
-  if (!CORE_API_KEY) {
-    throw new Error('Chave da API do CORE não configurada. Configure a variável de ambiente NEXT_PUBLIC_CORE_API_KEY.');
-  }
-
-  if (!articleId) {
-    throw new Error('ID do artigo não fornecido');
-  }
-
-  try {
-    const response = await makeRequest(() =>
-      axios.get(
-        `${CORE_API_URL}/works/${articleId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${CORE_API_KEY}`
-          },
-          timeout: 20000
-        }
-      )
-    );
-
-    if (!response.data) {
-      throw new Error('Resposta inválida da API do CORE');
-    }
-
-    const work = response.data;
-    return {
-      title: work.title || 'Sem título',
-      authors: Array.isArray(work.authors) ? work.authors.map(author => author.name || 'Autor desconhecido') : ['Autor desconhecido'],
-      year: work.yearPublished || new Date().getFullYear(),
-      abstract: work.abstract || 'Sem resumo disponível',
-      source: work.sourceFulltextUrl || work.source || 'Fonte não disponível',
-      url: work.downloadUrl || work.sourceFulltextUrl || '',
-      method: work.methodology || undefined,
-      location: work.location || undefined,
-      university: work.publisher || undefined,
-      journal: work.source || undefined,
-      type: work.type || undefined,
-      keywords: work.keywords || [],
-      fullText: work.fullText || undefined,
-      participants: work.participants || undefined,
-      mainKeywords: work.mainKeywords || []
-    };
-  } catch (error) {
-    if (error.response) {
-      console.error('Erro na resposta da API do CORE:', {
-        status: error.response.status,
-        data: error.response.data
-      });
-      
-      if (error.response.status === 500) {
-        throw new Error('A API do CORE está temporariamente indisponível. Por favor, tente novamente em alguns instantes.');
-      }
-      
-      if (error.response.status === 429) {
-        throw new Error('Muitas requisições em um curto período. Por favor, aguarde alguns instantes antes de tentar novamente.');
-      }
-      
-      throw new Error(`Erro na API do CORE: ${error.response.status} - ${error.response.data?.message || 'Erro desconhecido'}`);
-    } else if (error.request) {
-      console.error('Sem resposta da API do CORE:', error.request);
-      throw new Error('Não foi possível conectar com a API do CORE. Verifique sua conexão com a internet.');
-    } else {
-      console.error('Erro ao configurar requisição para a API do CORE:', error.message);
-      throw new Error(`Erro ao buscar detalhes do artigo: ${error.message}`);
-    }
-  }
-}; 
