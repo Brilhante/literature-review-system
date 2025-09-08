@@ -1,6 +1,6 @@
-# Literature Review System (LRS)
+# Literature Review System - Frontend
 
-Sistema web para busca e análise de artigos científicos, desenvolvido com arquitetura separada Frontend + Backend.
+Sistema web frontend para busca e análise de artigos científicos, desenvolvido com arquitetura separada Frontend + Backend.
 
 ## 🚀 Funcionalidades
 
@@ -29,15 +29,15 @@ Sistema web para busca e análise de artigos científicos, desenvolvido com arqu
 ### Pré-requisitos
 - Node.js 18+ 
 - NPM ou Yarn
-- Chave da API do CORE
 - Servidor Backend do LRS (rodando na porta 3005)
+- Chave da API do CORE (configurada no backend)
 
 ### Instalação
 
 #### 1. Clone o repositório
 ```bash
-git clone <seu-repositorio>
-cd literature-review-system
+git clone https://github.com/Brilhante/literature-review-system-front-end.git
+cd literature-review-system-front-end
 ```
 
 #### 2. Configure o Backend
@@ -58,9 +58,10 @@ cp .env.example .env.local
 
 Edite `.env.local` e configure:
 ```env
-NEXT_PUBLIC_CORE_API_KEY=sua_chave_do_core_aqui
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3005
 ```
+
+**Observação**: A chave da CORE API deve ser configurada apenas no backend, não no frontend.
 
 #### 4. Execute o servidor frontend
 ```bash
@@ -80,7 +81,6 @@ npm run dev
 2. **Acesse [vercel.com](https://vercel.com)**
 3. **Conecte seu repositório GitHub**
 4. **Configure as variáveis de ambiente:**
-   - `NEXT_PUBLIC_CORE_API_KEY` = sua chave da API do CORE
    - `NEXT_PUBLIC_BACKEND_URL` = URL do seu backend em produção
 
 5. **Deploy automático!** ✨
@@ -89,6 +89,7 @@ npm run dev
 
 **Para o Backend:**
 - Configure o backend em um serviço separado (Railway, Heroku, DigitalOcean, etc.)
+- Configure a chave da CORE API no backend
 - Atualize a variável `NEXT_PUBLIC_BACKEND_URL` no frontend para apontar para o backend em produção
 
 ### Opção 2: Deploy Conjunto
@@ -104,7 +105,7 @@ npm run dev
 │                     │  HTTP   │                     │
 │   Frontend (Next.js)│ ◄────► │   Backend Server    │
 │   Porta: 3004       │         │   Porta: 3005       │
-│                     │         │                     │
+│   Env: BACKEND_URL  │         │   Env: CORE_API_KEY │
 └─────────────────────┘         └─────────────────────┘
                                            │
                                            ▼
@@ -118,10 +119,13 @@ npm run dev
 
 ## 🔑 Obtendo Chave da API do CORE
 
+**Observação**: A chave da CORE API deve ser configurada apenas no **backend**, não no frontend.
+
+### Para o Backend:
 1. Acesse [core.ac.uk/api](https://core.ac.uk/api)
 2. Crie uma conta gratuita
 3. Solicite uma API key
-4. Use a chave nas variáveis de ambiente
+4. Configure a chave no backend (não no frontend)
 
 ## 📁 Estrutura do Projeto
 
@@ -265,11 +269,11 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 - **Documentação**: [Next.js Docs](https://nextjs.org/docs)
 - **CORE API**: [core.ac.uk/api](https://core.ac.uk/api)
-- **Issues**: [GitHub Issues](https://github.com/seu-usuario/literature-review-system/issues)
+- **Issues**: [GitHub Issues](https://github.com/Brilhante/literature-review-system-front-end/issues)
 
 ## ⚠️ Notas Importantes
 
 1. **Dependência do Backend**: O frontend requer que o backend esteja rodando na porta 3005
 2. **Variáveis de Ambiente**: Configure corretamente as URLs do backend para desenvolvimento/produção
-3. **Chave da API**: Necessária chave válida da CORE API para funcionamento
+3. **Chave da API**: A chave da CORE API deve ser configurada apenas no **backend**
 4. **Análise de IA**: A análise automática de artigos depende do backend configurado com IA

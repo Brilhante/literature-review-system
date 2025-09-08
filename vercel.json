@@ -17,6 +17,6 @@
     }
   ],
   "env": {
-    "NEXT_PUBLIC_CORE_API_KEY": "@core_api_key"
+    "NEXT_PUBLIC_BACKEND_URL": "@backend_url"
   }
 }
