@@ -93,13 +93,19 @@ export default function Home() {
 
   // Atualizar totalPages e totalResults dinamicamente
   useEffect(() => {
-    setTotalPages(Math.ceil(filteredByYearArticles.length / articlesPerPage));
+    const localTotalPages = Math.ceil(filteredByYearArticles.length / articlesPerPage);
     setTotalResults(filteredByYearArticles.length);
+
+    // Se há filtros de ano aplicados, usar paginação local
+    if (selectedYears.length > 0) {
+      setTotalPages(localTotalPages);
+    }
+    // Caso contrário, manter a paginação da API para permitir carregar mais resultados
 
     if ((currentPage - 1) * articlesPerPage >= filteredByYearArticles.length && currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [filteredByYearArticles, currentPage]);
+  }, [filteredByYearArticles, currentPage, selectedYears.length]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +113,7 @@ export default function Home() {
     setError(null);
     setFilterInfo(null);
     setCurrentPage(1);
+    setSelectedYears([]); // Limpar filtros de ano ao fazer nova busca
 
     try {
       const filters: SearchFilters = {};
@@ -122,7 +129,10 @@ export default function Home() {
 
       setAllArticles(articlesWithIds);
       setHasMoreResults(results.hasMoreResults);
-      setTotalPages(Math.ceil(results.totalHits / 10));
+      
+      // Calcular páginas baseado no total de resultados da API
+      const totalApiPages = Math.ceil(results.totalHits / articlesPerPage);
+      setTotalPages(totalApiPages);
       setTotalResults(results.totalHits);
       setSelectedArticle(null);
 
@@ -151,8 +161,13 @@ export default function Home() {
 
     setSelectedArticle(null);
 
+    // Se há filtro de ano aplicado, usar paginação local
+    if (selectedYears.length > 0) {
+      setCurrentPage(newPage);
+      return;
+    }
+
     // Calcular quantos artigos já temos carregados
-    const articlesPerPage = 10;
     const totalLoadedArticles = allArticles.length;
     const maxLocalPages = Math.ceil(totalLoadedArticles / articlesPerPage);
 
@@ -188,9 +203,11 @@ export default function Home() {
       setAllArticles(updatedAllArticles);
       setHasMoreResults(results.hasMoreResults);
 
-      // Atualizar total de resultados
-      setTotalResults(updatedAllArticles.length);
-      setTotalPages(Math.ceil(updatedAllArticles.length / articlesPerPage));
+      // Não sobrescrever totalPages aqui, apenas se necessário
+      const currentTotalPages = Math.ceil(results.totalHits / articlesPerPage);
+      if (currentTotalPages > totalPages) {
+        setTotalPages(currentTotalPages);
+      }
 
     } catch (err) {
       console.error('Erro na paginação:', err);

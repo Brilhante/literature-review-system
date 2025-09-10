@@ -34,7 +34,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <span className="px-6 py-2 text-gray-700 font-medium">
           Página {currentPage} de {totalPages}
         </span>
-        {currentPage < totalPages && hasMoreResults && (
+        {currentPage < totalPages && (
           <button
             onClick={() => onPageChange(currentPage + 1)}
             disabled={loading}
